@@ -22,7 +22,7 @@ AIエンジニアリング実践講座（AIE2026）の演習と宿題で使う�
 1. このリポジトリを自分のアカウントに **fork** する
 2. [Google AI Studio](https://aistudio.google.com/apikey) で Gemini API キーを作る
 3. GitHub の **Settings → Codespaces → Secrets** に `GEMINI_API_KEY` を登録し、使う repository に自分の fork を選ぶ
-4. 自分の fork で **Code → Codespaces → Create codespace on main**
+4. 自分の fork で **Code → Codespaces → Create codespace on main**<!--  -->
 5. ターミナルで動作確認
 
 ```bash
