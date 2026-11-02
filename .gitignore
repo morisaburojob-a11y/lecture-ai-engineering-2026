@@ -10,5 +10,8 @@ __pycache__/
 # 個人の学習ログ（第3回の宿題で作成）は共有しない
 learning_log/
 
+# 作業用の一時ファイル（提出物に含めない）
+TEMP/
+
 # macOS
 .DS_Store
