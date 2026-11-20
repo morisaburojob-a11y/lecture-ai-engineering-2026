@@ -22,6 +22,10 @@ RAG_TOP_K = 5
 GRAPH_START_K = 3
 GRAPH_HOPS = 2
 GRAPH_MAX_RESULTS = 10
+# 第5回 発展: 用語経由のGraph探索（search_graph_terms）。広げる候補の上限と、
+# 一番近いseedとのコサイン距離の差がこれ以下の候補だけを返す閾値。
+GRAPH_TERMS_MAX_EXPANDED = 5
+GRAPH_TERMS_MARGIN = 0.08
 EMBEDDING_MODEL = "gemini-embedding-001"
 EMBEDDING_DIMENSIONS = 768
 # 2,048トークンの上限に対し、タスク指定等の分を残す。超過時は切り捨てず停止する。

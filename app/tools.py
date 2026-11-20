@@ -126,3 +126,20 @@ def search_graph(query: str) -> str:
         return json.dumps({"error": str(e)}, ensure_ascii=False)
     except APIError as e:
         return json.dumps({"error": api_error_message(e.code)}, ensure_ascii=False)
+
+
+def search_graph_terms(query: str) -> str:
+    """資料を検索し、共通用語・関連用語をたどって、質問に近い関連ページの本文と引用情報を返す。
+
+    queryに調べたい内容を指定する。前後ページはたどらず、質問に近い候補だけを返す。
+    """
+    import sqlite3
+    from google.genai.errors import APIError
+    from app.retrieval import search_graph_terms as search
+
+    try:
+        return json.dumps(search(query), ensure_ascii=False)
+    except (ValueError, OSError, sqlite3.Error) as e:
+        return json.dumps({"error": str(e)}, ensure_ascii=False)
+    except APIError as e:
+        return json.dumps({"error": api_error_message(e.code)}, ensure_ascii=False)

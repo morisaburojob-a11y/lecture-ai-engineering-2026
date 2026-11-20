@@ -18,6 +18,7 @@ from app.config import (
     EMBEDDING_DIMENSIONS, EMBEDDING_MAX_TOKENS, EMBEDDING_MODEL,
     RAG_DB, RAG_DOCUMENT_IDS, RAG_SOURCE, RAG_TOP_K, RAG_TREE, get_api_key,
     RAG_GRAPH, GRAPH_START_K, GRAPH_HOPS, GRAPH_MAX_RESULTS,
+    GRAPH_TERMS_MARGIN, GRAPH_TERMS_MAX_EXPANDED,
 )
 
 
@@ -124,8 +125,8 @@ def open_index(path: Path):
         db.close()
 
 
-def search(query: str) -> list[dict]:
-    """質問を埋め込み、近いページを最大RAG_TOP_K件返す。"""
+def search(query: str, top_k: int | None = RAG_TOP_K) -> list[dict]:
+    """質問を埋め込み、近いページを最大top_k件返す（Noneなら全ページを距離順に返す）。"""
     if not isinstance(query, str) or not query.strip():
         raise ValueError("検索語が空です。")
     with open_index(RAG_DB) as db:
@@ -134,7 +135,7 @@ def search(query: str) -> list[dict]:
             SELECT page_id, document_id, lecture, document_title, section, title, page, content,
                    vec_distance_cosine(embedding, ?) AS distance
             FROM chunks ORDER BY distance, page_id LIMIT ?
-        """, (sqlite_vec.serialize_float32(vector), RAG_TOP_K))
+        """, (sqlite_vec.serialize_float32(vector), -1 if top_k is None else top_k))
         return [dict(row) for row in rows]
 
 
@@ -183,6 +184,91 @@ def search_graph(query: str) -> dict:
     expanded = [candidate for _, candidate in sorted(candidates.values())]
     return {"seeds": results, "expanded": expanded[:max(0, GRAPH_MAX_RESULTS - len(results))],
             "max_hops": GRAPH_HOPS}
+
+
+def search_graph_terms(query: str, start_k: int = GRAPH_START_K, max_expanded: int = GRAPH_TERMS_MAX_EXPANDED,
+                       margin: float | None = GRAPH_TERMS_MARGIN, related: bool = True,
+                       bridge: bool = True) -> dict:
+    """第5回 発展: 用語の関係だけで候補を広げ、質問との近さで絞るGraph探索。
+
+    元の search_graph との違い:
+    - 前後ページ（next_page）はたどらない。ページが近いことは内容の関連を保証しないため
+    - seed → 用語 → ページ（2 hop）に加え、seed → 用語 → 関連用語 → ページ（3 hop）もたどる。
+      同じ話題が別の章・別の回にあるページへ届かせるため
+    - 広げた候補は、質問ベクトルとページの埋め込みの距離で並べ替える。距離は索引の
+      埋め込みをそのまま使うので、追加のAPI呼び出しはない
+    - 一番近いseedとの距離の差が margin を超える候補は返さない（余計な本文を増やさない）
+    - bridge: 質問文に用語（別名を含む）が出てくれば、その用語を含むページのうち質問に最も近い
+      ものを回ごとに1つ加える。質問全体の埋め込みでは後半の小さな話題（例：第1回のRAGの仕組み）が
+      埋もれるため、用語を手がかりに別の回へ橋を架ける。合計は GRAPH_MAX_RESULTS 件まで
+    """
+    pages = {page["page_id"]: page for page in load_pages(RAG_SOURCE)}
+    graph = json.loads(RAG_GRAPH.read_text(encoding="utf-8"))
+    terms = {node["id"]: node for node in graph["nodes"] if node["kind"] == "term"}
+    page_terms, term_pages, term_related = defaultdict(set), defaultdict(set), defaultdict(set)
+    for edge in graph["edges"]:
+        a, b = edge["source"], edge["target"]
+        if edge["relation"] == "mentions":
+            page, term = (a, b) if a in pages else (b, a)
+            if page in pages and term in terms:
+                page_terms[page].add(term)
+                term_pages[term].add(page)
+        elif edge["relation"] == "related_term" and a in terms and b in terms:
+            term_related[a].add(b)
+            term_related[b].add(a)
+
+    ranked = [hit for hit in search(query, top_k=None) if hit["page_id"] in pages]
+    distance = {hit["page_id"]: hit["distance"] for hit in ranked}
+    seeds = ranked[:start_k]
+    seed_ids = {seed["page_id"] for seed in seeds}
+
+    routes = {}  # 候補ページ → 最短の経路（seed, 用語, [関連用語,] ページ）
+    for seed in seeds:
+        for term in sorted(page_terms[seed["page_id"]]):
+            hops = [(term, [term])]
+            if related:
+                hops += [(other, [term, other]) for other in sorted(term_related[term])]
+            for last_term, via in hops:
+                for page_id in term_pages[last_term]:
+                    if page_id in seed_ids:
+                        continue
+                    route = [seed["page_id"], *via, page_id]
+                    if page_id not in routes or len(route) < len(routes[page_id]):
+                        routes[page_id] = route
+
+    best = seeds[0]["distance"] if seeds else 0.0
+    candidates = sorted(routes, key=lambda page_id: (distance.get(page_id, 9.0), page_id))
+    if margin is not None:
+        candidates = [page_id for page_id in candidates if distance.get(page_id, 9.0) - best <= margin]
+
+    chosen = candidates[:max_expanded]
+
+    if bridge:
+        lowered = query.lower()
+        matched = sorted(term for term, node in terms.items()
+                         if any(alias.lower() in lowered for alias in [node["title"], *node.get("aliases", [])]))
+        taken = seed_ids | set(chosen)
+        for term in matched:
+            for lecture in sorted({pages[p]["lecture"] for p in term_pages[term]}):
+                options = [p for p in term_pages[term] if pages[p]["lecture"] == lecture]
+                best_page = min(options, key=lambda p: (distance.get(p, 9.0), p))
+                if best_page in taken or len(seeds) + len(chosen) >= GRAPH_MAX_RESULTS:
+                    continue
+                routes[best_page] = [term, best_page]  # 質問文 → 用語 → ページ
+                chosen.append(best_page)
+                taken.add(best_page)
+
+    def title(node_id):
+        return pages[node_id]["title"] if node_id in pages else terms[node_id]["title"]
+
+    return {
+        "seeds": [{**seed, "hops": 0, "path": [{"id": seed["page_id"], "title": seed["title"]}]}
+                  for seed in seeds],
+        "expanded": [{**pages[page_id], "distance": distance.get(page_id), "hops": len(routes[page_id]) - 1,
+                      "path": [{"id": n, "title": title(n)} for n in routes[page_id]]}
+                     for page_id in chosen],
+        "max_hops": 3 if related else 2,
+    }
 
 
 

@@ -66,6 +66,9 @@ GRAPH_INSTRUCTIONS = """\
 - 宿題の答えそのものは書かず、考え方のヒントで導く。
 """
 
+# 第5回 発展: 用語経由で広げ、質問との近さで絞るGraph探索（search_graph_terms）用
+GRAPH_TERMS_INSTRUCTIONS = GRAPH_INSTRUCTIONS.replace("search_graph", "search_graph_terms")
+
 FULL_CONTEXT_INSTRUCTIONS = """\
 あなたはAIエンジニアリング講座の学習支援エージェントです。
 - 入力の資料を参照して質問に答え、資料名とPDFページ番号を示す。
@@ -180,6 +183,8 @@ def main() -> None:
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument("--mcp", action="store_true", help="第5回: ツールを MCP サーバー（app/mcp_servers.json）から受け取る")
     modes.add_argument("--graph", action="store_true", help="検索結果からグラフをたどり、候補ページを読んで答える")
+    modes.add_argument("--graph-terms", action="store_true",
+                       help="第5回 発展: 用語経由でたどり、質問に近い候補だけを読んで答える")
     modes.add_argument("--tree", action="store_true", help="目次をたどり、必要なページを読んで答える")
     modes.add_argument("--full-context", action="store_true", help="検索せず、lectures.jsonの全資料を一度に渡す")
     parser.add_argument("--list-tools", action="store_true", help="モデルに見えるツール一覧を表示して終了する（APIキー不要）")
@@ -191,6 +196,8 @@ def main() -> None:
         mode = target.override(instructions=TREE_INSTRUCTIONS, tools=[tools.browse_tree])
     elif args.graph:
         mode = target.override(instructions=GRAPH_INSTRUCTIONS, tools=[tools.search_graph])
+    elif args.graph_terms:
+        mode = target.override(instructions=GRAPH_TERMS_INSTRUCTIONS, tools=[tools.search_graph_terms])
     with mode:
         if args.list_tools:
             if args.full_context:
