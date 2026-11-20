@@ -1,0 +1,38 @@
+[
+  {
+    "id": "rsi",
+    "question": "RSIとは何ですか。AIがAIの開発を支援する循環はどう説明されていますか",
+    "gold": ["lec01-main-p010", "lec03-main-p055"],
+    "note": "第1回 p.10と第3回 p.55（回をまたぐ）"
+  },
+  {
+    "id": "resend-cost",
+    "question": "チャットでは毎回これまでのやり取りを送り直していますが、料金は何で数えられますか。毎回送る部分を安くする仕組みはありますか",
+    "gold": ["lec03-main-p008", "lec02-main-p009", "lec03-main-p016"],
+    "note": "第3回 p.8（送り直し）・p.16（キャッシュ）と第2回 p.9（料金はトークン数）"
+  },
+  {
+    "id": "knowledge-cutoff",
+    "question": "モデルが今年のシラバスや締切を知らないのはなぜですか。知識を補うにはFine-TuningとRAGのどちらが向いていますか",
+    "gold": ["lec02-main-p022", "lec02-main-p046"],
+    "note": "第2回 p.22（ナレッジカットオフ）と p.46（知識はRAG）。別の章"
+  },
+  {
+    "id": "system-prompt-config",
+    "question": "システムプロンプトには何が入っていますか。AGENTS.mdのような設定ファイルにはどんな危険がありますか",
+    "gold": ["lec03-main-p009", "lec03-main-p050"],
+    "note": "第3回 p.9（Part 2）と p.50（Part 9）"
+  },
+  {
+    "id": "model-source",
+    "question": "Hugging Faceにはどんなモデルが公開されていますか。モデルを使う方法にはどんな選択肢がありますか",
+    "gold": ["lec01-main-p014", "lec02-main-p038"],
+    "note": "第1回 p.14と第2回 p.38（回をまたぐ）"
+  },
+  {
+    "id": "agent-error",
+    "question": "LLMは同じ質問でも答えが毎回変わりますが、エージェントでループを回すとその影響はどうなりますか",
+    "gold": ["lec02-main-p013", "lec03-main-p019"],
+    "note": "第2回 p.13（答えは毎回変わる）と第3回 p.19（誤差の累積）"
+  }
+]
